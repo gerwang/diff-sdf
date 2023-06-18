@@ -1,0 +1,16 @@
+<scene version="2.1.0">
+	<!--<include filename="common-sdf.xml"/>-->
+	<!-- <shape type="dummy">
+		<ref id="$main_bsdf_name" name="bsdf"/>
+	</shape> -->
+
+	<shape type="sphere" id="dummy_sdf_">
+		<transform name="to_world">
+			<scale value="0.0000001"/>
+			<translate z="0"/>
+			<translate y="20"/>
+			<translate x="0"/>
+		</transform>
+		<ref id="$main_bsdf_name" name="bsdf"/>
+	</shape>
+</scene>

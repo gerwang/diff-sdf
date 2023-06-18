@@ -1,0 +1,17 @@
+<scene version="2.1.0">
+	<sensor type="spherical" id="plugin" name="plugin">
+		<film type="hdrfilm" name="film">
+			<integer name="width" value="1024"/>
+			<integer name="height" value="512"/>
+			<rfilter type="gaussian" name="filter">
+				<float name="stddev" value="0.250000"/>
+			</rfilter>
+			<string name="pixel_format" value="rgba"/>
+		</film>
+		<sampler type="independent" name="sampler"/>
+		<integer name="near_clip" value="0"/>
+		<transform name="to_world">
+			<translate value="0.500000 0.500000 0.500000"/>
+		</transform>
+	</sensor>
+</scene>

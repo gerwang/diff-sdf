@@ -2,11 +2,12 @@ import gc
 
 import drjit as dr
 import mitsuba as mi
+
 from shapes import Grid3d
 from warp import DummyWarpField
 
 
-class ReparamIntegrator(mi.SamplingIntegrator):
+class ReparamSplitLightIntegrator(mi.SamplingIntegrator):
 
     def __init__(self, props=mi.Properties()):
         super().__init__(props)
@@ -17,7 +18,6 @@ class ReparamIntegrator(mi.SamplingIntegrator):
         self.force_optix = props.get('force_optix', False)
         self.antithetic_sampling = props.get('antithetic_sampling', False)
         self.use_bbox_sdf = props.get('use_bbox_sdf', False)
-        props.mark_queried('guiding_mis_compensation')
         props.mark_queried('query_emitter_index')
         props.mark_queried('curvature_epsilon')
 
@@ -36,6 +36,14 @@ class ReparamIntegrator(mi.SamplingIntegrator):
         self.sdf_shape = None
         self.is_prepared = False
         self.use_optix = True
+        self.use_aovs = False
+        self.emitter_scene = None
+        self.adjoint_emitters = []
+
+    def get_emitter_scene(self, scene):
+        if self.emitter_scene is None:
+            return scene
+        return self.emitter_scene
 
     def prepare(self, sensor, seed, spp, aovs=[]):
         film = sensor.film()
@@ -54,7 +62,6 @@ class ReparamIntegrator(mi.SamplingIntegrator):
         sampler.seed(seed, wavefront_size)
         film.prepare(aovs)
         return sampler, spp
-
 
     def prepare_sdf(self, scene):
         if self.is_prepared:
@@ -82,7 +89,8 @@ class ReparamIntegrator(mi.SamplingIntegrator):
         dr.eval(self.sdf_shape)
         self.is_prepared = True
 
-    def eval_sample(self, mode, scene, sensor, sampler, block, _aovs, position_sample, diff_scale_factor, active=mi.Bool(True)):
+    def eval_sample_one(self, mode, scene, sensor, sampler, _aovs, position_sample, diff_scale_factor,
+                        active=mi.Bool(True)):
         aperture_sample = mi.Point2f(0.5)
         if sensor.needs_aperture_sample():
             aperture_sample = sampler.next_2d(active)
@@ -98,7 +106,26 @@ class ReparamIntegrator(mi.SamplingIntegrator):
         ray.scale_differential(diff_scale_factor)
         rgb, valid_ray, det, aovs_ = self.sample(mode, scene, sampler, ray,
                                                  None, None, None, active)
+        p = mi.Point3f(aovs_[0], aovs_[1], aovs_[2])
+        wi = mi.Point3f(aovs_[3], aovs_[4], aovs_[5])
+        guiding_weight = aovs_[6]
+        active_s = aovs_[7]
+        aovs_ = aovs_[8:]
+        return {
+            'rgb': rgb,
+            'valid_ray': valid_ray,
+            'det': det,
+            'aovs_': aovs_,
+            'p': p,
+            'wi': wi,
+            'guiding_weight': guiding_weight,
+            'active_s': active_s,
+            'aperture_sample': aperture_sample,
+            'ray': ray,
+        }
 
+    def eval_sample_two(self, sensor, block, _aovs, rgb, valid_ray, det, aovs_, aperture_sample, ray,
+                        active=mi.Bool(True)):
         # Re-evaluate sample's sensor position and sensor importance
         it = dr.zeros(mi.Interaction3f)
         it.p = ray.o + ray.d
@@ -114,7 +141,7 @@ class ReparamIntegrator(mi.SamplingIntegrator):
         aovs[1] = rgb.y
         aovs[2] = rgb.z
         if has_alpha_channel:
-            aovs.append(dr.select(valid_ray, mi.Float(1.0), mi.Float(0.0)))
+            aovs.append(valid_ray)
         aovs.append(dr.replace_grad(mi.Float(1.0), det * ray_weight[0]))
 
         aovs = aovs + aovs_
@@ -122,6 +149,13 @@ class ReparamIntegrator(mi.SamplingIntegrator):
 
     def render(self, scene, sensor=0, seed=0,
                spp=0, develop=True, evaluate=True, mode=dr.ADMode.Primal):
+        var_dict = self.render_one(scene, sensor, seed, spp, develop, evaluate, mode)
+        # dr.schedule(var_dict)  # evaluate all the variables produced by render_one to avoid rendering again
+        self.evaluate_light(scene, var_dict)
+        return self.render_two(var_dict)
+
+    def render_one(self, scene, sensor=0, seed=0,
+                   spp=0, develop=True, evaluate=True, mode=dr.ADMode.Primal):
         if not develop:
             raise Exception("Must use develop=True for this AD integrator")
         self.prepare_sdf(scene)
@@ -172,14 +206,43 @@ class ReparamIntegrator(mi.SamplingIntegrator):
         active = mi.Bool(True)
         r = sampler.next_2d(active)
         position_sample = pos + r
-        if self.antithetic_sampling:
-            position_sample2 = pos - r + 1.0
-            sampler2 = sampler.clone()
-        self.eval_sample(mode, scene, sensor, sampler, block, _aovs, position_sample, diff_scale_factor, active)
-        # Antithetic sample: mirrored
-        if self.antithetic_sampling:
-            self.eval_sample(mode, scene, sensor, sampler2, block, _aovs, position_sample2, diff_scale_factor, active)
+        # TODO antithetic_sampling
+        var_dict = self.eval_sample_one(mode, scene, sensor, sampler, _aovs, position_sample, diff_scale_factor, active)
+        var_dict.update({
+            'sensor': sensor,
+            'block': block,
+            '_aovs': _aovs,
+            'active': active,
+        })
+        return var_dict
 
+    def evaluate_light(self, scene, var_dict):
+        p = var_dict['p']
+        wi = var_dict['wi']
+        guiding_weight = var_dict['guiding_weight']
+        active_s = var_dict['active_s']
+        del var_dict['p']
+        del var_dict['wi']
+        del var_dict['guiding_weight']
+        del var_dict['active_s']
+        si = dr.zeros(mi.SurfaceInteraction3f)
+        si.p = p
+        si.wi = wi
+        if hasattr(scene.environment(), 'set_guiding_weight'):
+            scene.environment().set_guiding_weight(guiding_weight)
+        emitter_val = scene.environment().eval(si)
+        var_dict['rgb'] *= dr.select(active_s, emitter_val, mi.Color3f(0.))
+
+    def render_two(self, var_dict):
+        sensor = var_dict['sensor']
+        del var_dict['sensor']
+        block = var_dict['block']
+        del var_dict['block']
+        _aovs = var_dict['_aovs']
+        del var_dict['_aovs']
+        active = var_dict['active']
+        del var_dict['active']
+        self.eval_sample_two(sensor, block, _aovs, **var_dict, active=active)
         gc.collect()
 
         # Develop the film given the block
@@ -188,15 +251,25 @@ class ReparamIntegrator(mi.SamplingIntegrator):
         return primal_image
 
     def render_backward(self, scene, params, grad_in, sensor=0, seed=0, spp=0):
-        image = self.render(scene=scene, sensor=sensor, seed=seed,
-                            spp=spp, develop=True, evaluate=False, mode=dr.ADMode.Backward)
-        dr.backward_from(image * grad_in)
+        def backward(i, spp):
+            image = self.render(scene=scene, sensor=sensor, seed=seed + i,
+                                spp=spp, develop=True, evaluate=False, mode=dr.ADMode.Backward)
+            dr.backward_from(image * grad_in)
+
+        backward(0, spp)
 
     def render_forward(self, scene, params, sensor=0, seed=0, spp=0):
-        image = self.render(scene=scene, sensor=sensor, seed=seed, spp=spp,
-                            develop=True, evaluate=False, mode=dr.ADMode.Forward)
-        dr.forward_to(image)
-        return dr.grad(image)
+        def forward(i, spp, last):
+            image = self.render(scene=scene, sensor=sensor, seed=seed + i, spp=spp,
+                                develop=True, evaluate=False, mode=dr.ADMode.Forward)
+            if last:
+                flags = dr.ADFlag.Default
+            else:
+                flags = dr.ADFlag.ClearEdges | dr.ADFlag.ClearInterior
+            dr.forward_to(image, flags=flags)
+            return dr.grad(image)
+
+        return forward(0, spp, last=True)
 
     def ray_test(self, scene, sampler, ray, depth=0, reparam=True, active=True):
         return self.ray_intersect(scene, sampler, ray, depth=depth, reparam=reparam, ray_test=True, active=active)
@@ -232,6 +305,8 @@ class ReparamIntegrator(mi.SamplingIntegrator):
         if ray_test:
             return its_found, div, extra_output
         else:
+            si.p = dr.select(si.is_valid(), si.p, ray.o)
+            si_d.p = dr.select(si_d.is_valid(), si_d.p, dr.detach(ray.o))
             return si, si_d, div, extra_output
 
     def ray_intersect_preliminary(self, scene, ray, active=True):
@@ -265,7 +340,8 @@ class ReparamIntegrator(mi.SamplingIntegrator):
 
     def aov_names(self):
         if self.use_aovs:
-            return ['sdf_value', 'warp_t', 'vx', 'vy', 'div', 'i', 'weight_sum', 'weight', 'warp_t_dx', 'warp_t_dy', 'warp_t_dz']
+            return ['sdf_value', 'warp_t', 'vx', 'vy', 'div', 'i', 'weight_sum', 'weight', 'warp_t_dx', 'warp_t_dy',
+                    'warp_t_dz']
         else:
             return []
 

@@ -1,0 +1,20 @@
+<scene version="2.1.0">
+	<default name="mesh_path" value="." />
+
+	<bsdf type="principled" id="principled-mat">
+		<texture type="bitmap" name="base_color">
+			<string name="filename" value="$mesh_path/reflectance.png"/>
+			<boolean name="raw" value="true" />
+		</texture>
+		<float name="specular" value="1.000000"/>
+		<texture type="bitmap" name="roughness">
+			<string name="filename" value="$mesh_path/roughness.png"/>
+			<boolean name="raw" value="true" />
+		</texture>
+	</bsdf>
+
+	<shape type="obj">
+		<string name="filename" value="$mesh_path/mesh.obj"/>
+		<ref id="principled-mat" name="bsdf"/>
+	</shape>
+</scene>

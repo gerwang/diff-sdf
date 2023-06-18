@@ -1,0 +1,15 @@
+<scene version="2.1.0">
+	<default name="mesh_path" value="." />
+
+    <bsdf type="diffuse" id="diffuse-mat">
+        <texture type="bitmap" name="reflectance">
+			<string name="filename" value="$mesh_path/reflectance.png"/>
+			<boolean name="raw" value="true" />
+        </texture>
+    </bsdf>
+
+	<shape type="obj">
+		<string name="filename" value="$mesh_path/mesh.obj"/>
+		<ref id="diffuse-mat" name="bsdf"/>
+	</shape>
+</scene>

@@ -6,7 +6,7 @@ import redistancing
 import numpy as np
 
 
-def create_sdf(mesh_fn, resolution, refine_surface=True):
+def create_sdf(mesh_fn, resolution, refine_surface=True, offset=0.):
     """Convert a watertight mesh to an SDF using ray tracing and fast sweeping"""
 
     mesh_plugin_type = "obj" if mesh_fn.endswith('.obj') else "ply"
@@ -17,7 +17,7 @@ def create_sdf(mesh_fn, resolution, refine_surface=True):
 
     # Part I: Compute SDF by first tracing rays to determine a binary occupancy
     # mask Then use fast sweeping to extend that to an SDF. This assumes the shape is watertight.
-    z, y, x = dr.meshgrid(*[dr.linspace(mi.Float, -0.5 + 0.5 / res, 0.5 - 0.5 / res, res)
+    z, y, x = dr.meshgrid(*[dr.linspace(mi.Float, -0.5 + offset + 0.5 / res, 0.5 + offset - 0.5 / res, res)
                           for i in range(3)], indexing='ij')
     ray = mi.Ray3f(mi.Point3f(x, y, z), dr.normalize(mi.Vector3f(0, 1, 0)))
     si = mesh_scene.ray_intersect(ray)

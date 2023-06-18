@@ -1,0 +1,43 @@
+<scene version="2.1.0">
+	<path value="./"/>
+	<default name="sensors_filename" value="empty.xml"/>
+	<default name="sdf_filename" value="sdfs/bunny_64.vol"/>
+	<include filename="common.xml"/>
+	<default name="emitter_scene" value="emitters/vmf.xml"/>
+	<include filename="$emitter_scene"/>
+
+	<bsdf type="principled" id="principled-bsdf">
+		<texture type="volume" name="base_color">
+			<volume type="gridvolume" name="volume">
+				<string name="filename" value="textures/red.vol"/>
+			</volume>
+		</texture>
+		<texture type="volume" name="roughness">
+			<volume type="gridvolume" name="volume">
+				<string name="filename" value="textures/gray.vol"/>
+			</volume>
+		</texture>
+		<float name="specular" value="1.000000"/>
+	</bsdf>
+
+	<bsdf type="diffuse" id="diffuse-bsdf">
+        <texture type="volume" name="reflectance">
+            <volume type="gridvolume" name="volume">
+                <string name="filename" value="textures/red.vol"/>
+            </volume>
+        </texture>
+	</bsdf>
+
+	<bsdf type="twosided" id="no-tex-bsdf">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.8, 0.2, 0.2"/>
+		</bsdf>
+	</bsdf>
+
+	<default name="main_bsdf_name" value="principled-bsdf"/>
+
+	<default name="shape_file" value="dummysdf.xml"/>
+	<include filename="$shape_file"/>
+	<default name="extra_mesh_file" value="empty.xml"/>
+	<include filename="$extra_mesh_file"/>
+</scene>

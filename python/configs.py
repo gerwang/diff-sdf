@@ -1,17 +1,15 @@
 import inspect
 import sys
 
-import integrators.sdf_silhouette_reparam
-import integrators.sdf_simple_shading_reparam
-import integrators.sdf_direct_reparam
-import integrators.sdf_prb_reparam
+from integrators import import_integrators
+
+import_integrators()
 
 from warp import WarpField2D, WarpFieldConvolution, DummyWarpField
 
 
 class BaseConfig:
     def __init__(self):
-        self.learning_rate = 4e-2
         self.n_iter = 512
         self.spp = 64
         self.integrator = 'sdf_direct_reparam'
@@ -23,7 +21,6 @@ class BaseConfig:
         self.pretty_name = 'baseconfig'
         self.name = 'default'
         self.use_finite_differences = False
-        self.mask_optimizer = False
 
         # Clamp the geometry terms used in the reparameterization to avoid extreme outliers
         self.geom_clamp_threshold = 0.05
@@ -48,6 +45,50 @@ class Warp(BaseConfig):
         self.pretty_name_short = 'Ours'
 
         self.name = 'warp'
+
+
+class WarpOne(BaseConfig):
+    """Our method + path replay to optimize accounting for indirect illumination"""
+    def __init__(self):
+        super().__init__()
+        self.pretty_name = 'Ours'
+        self.pretty_name_short = 'Ours'
+        self.name = 'warpone'
+        self.integrator = 'sdf_direct_reparam_onesample'
+        self.spp = 128
+
+
+class WarpOneMis(BaseConfig):
+    """Our method + path replay to optimize accounting for indirect illumination"""
+    def __init__(self):
+        super().__init__()
+        self.pretty_name = 'Ours'
+        self.pretty_name_short = 'Ours'
+        self.name = 'warponemis'
+        self.integrator = 'sdf_direct_reparam_onesamplemis'
+        self.spp = 128
+
+
+class WarpEmission(BaseConfig):
+    """Our method + path replay to optimize accounting for indirect illumination"""
+
+    def __init__(self):
+        super().__init__()
+        self.pretty_name = 'Ours'
+        self.pretty_name_short = 'Ours'
+        self.name = 'warpemission'
+        self.integrator = 'sdf_emission_reparam'
+
+
+class WarpEmitterDistribution(BaseConfig):
+    """Our method + path replay to optimize accounting for indirect illumination"""
+
+    def __init__(self):
+        super().__init__()
+        self.pretty_name = 'Ours'
+        self.pretty_name_short = 'Ours'
+        self.name = 'warpemitterdistribution'
+        self.integrator = 'sdf_emitter_distribution_reparam'
 
 
 class WarpPRB(BaseConfig):
@@ -206,6 +247,42 @@ class FiniteDifferences(BaseConfig):
         return None
 
 
+class FiniteDifferencesOne(BaseConfig):
+    """Finite differences method that is used for some figures. This cannot
+    really be used for any optimizations and is only useful for gradient
+    validation."""
+
+    def __init__(self):
+        super().__init__()
+        self.pretty_name = 'Finite differences one'
+        self.pretty_name_short = 'FD'
+        self.name = 'fdone'
+        self.use_finite_differences = True
+        self.integrator = 'sdf_direct_reparam_onesample'
+        self.spp = 128
+
+    def get_warpfield(self, sdf_object):
+        return None
+
+
+class FiniteDifferencesOneMis(BaseConfig):
+    """Finite differences method that is used for some figures. This cannot
+    really be used for any optimizations and is only useful for gradient
+    validation."""
+
+    def __init__(self):
+        super().__init__()
+        self.pretty_name = 'Finite differences one'
+        self.pretty_name_short = 'FD'
+        self.name = 'fdone'
+        self.use_finite_differences = True
+        self.integrator = 'sdf_direct_reparam_onesamplemis'
+        self.spp = 128
+
+    def get_warpfield(self, sdf_object):
+        return None
+
+
 CONFIGS = {name.lower(): obj
            for name, obj in inspect.getmembers(sys.modules[__name__])
            if inspect.isclass(obj)}
@@ -230,7 +307,7 @@ def apply_cmdline_args(config, unknown_args, return_dict=False):
             return None
         if dest_type == bool:
             return value.lower() in ['true', '1']
-        return dest_type(value)
+        return value
 
     # Parse input list of strings key=value
     input_args = {}

@@ -1,0 +1,10 @@
+<scene version="2.1.0">
+	<path value="../" />
+    <default name="padding_size" value="0.0"/>
+	<emitter type="vMF">
+        <string name="filename" value="textures/cathedral.hdr" />
+        <boolean name="mis_compensation" value="true" />
+        <boolean name="outside_only" value="false" />
+        <float name="padding_size" value="$padding_size"/>
+	</emitter>
+</scene>

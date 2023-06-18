@@ -39,3 +39,7 @@ def bbox_distance_inside_d(x, bbox):
     n[(min_dist.z < min_dist.x) & (min_dist.z < min_dist.y)] = mi.Vector3f(0, 0, 1)
     bbox_dist_d = dr.select(bbox_dist > 0.0, n * dr.sign(bbox_max_dist - bbox_min_dist), 0.0)
     return bbox_dist, bbox_dist_d
+
+
+def safe_exp(x, bias=-5.):
+    return dr.exp(dr.minimum(x + bias, 88.))  # safe_exp

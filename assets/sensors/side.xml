@@ -1,0 +1,30 @@
+<scene version="2.1.0">
+	<default name="spp" value="64"/>
+	<default name="resx" value="128"/>
+	<default name="resy" value="128"/>
+	<default name="pixel_format" value="rgba"/>
+	<default name="sample_border" value="true"/>
+	<default name="pixel_filter" value="gaussian"/>
+
+	<sampler type="independent" id="sampler">
+		<integer name="sample_count" value="$spp"/>
+	</sampler>
+
+	<film type="hdrfilm" id="film">
+		<integer name="width" value="$resx"/>
+		<integer name="height" value="$resy"/>
+		<string name="pixel_format" value="$pixel_format" />
+		<rfilter type="$pixel_filter" />
+		<boolean name="sample_border" value="$sample_border" />
+	</film>
+
+	<sensor type="perspective">
+		<float name="fov" value="90"/>
+		<transform name="to_world">
+			<lookat origin="-0.3, 0.5, -0.3" target="0.5, 0.5, 0.5" up="0, 1, 0"/>
+		</transform>
+
+		<ref id="film"/>
+		<ref id="sampler"/>
+	</sensor>
+</scene>

@@ -375,7 +375,7 @@ class SDFBase:
 class Grid3d(SDFBase):
     """Grid-based SDF class. This is the class that is used for all our optimizations."""
 
-    def __init__(self, data, transform=None):
+    def __init__(self, data, transform=None, use_bbox=False):
         super().__init__()
 
         self.has_transform = transform is not None
@@ -390,6 +390,10 @@ class Grid3d(SDFBase):
         self.to_world = transform
         self.to_local = self.to_world.inverse()
         self.update_bbox()
+        if use_bbox:
+            self.bbox_sdf = BoxSDF(mi.Point3f(0.5), mi.Vector3f(0.5), smoothing=0.0)
+        else:
+            self.bbox_sdf = None
 
     def update_bbox(self):
         self.aabb = mi.ScalarBoundingBox3f()
@@ -418,7 +422,10 @@ class Grid3d(SDFBase):
         return mi.BoundingBox3f(self.aabb.min - delta, self.aabb.max + delta)
 
     def eval(self, x, detached=False):
-        return self.call_wrap(x, self.texture.eval_cubic, detached)[0]
+        v = self.call_wrap(x, self.texture.eval_cubic, detached)[0]
+        if self.bbox_sdf is not None:
+            v = dr.maximum(v, self.bbox_sdf.eval(x, detached))
+        return v
 
     def eval_grad(self, x, detached=False):
         """Evaluates the image gradient using bspline interpolation"""
@@ -433,12 +440,17 @@ class Grid3d(SDFBase):
         g = mi.Vector3f(g[0])
         if self.has_transform:
             g = mi.Transform4f(self.to_world) @ mi.Normal3f(g.x, g.y, g.z)
-        return mi.Float(v[0]), g
+        v = mi.Float(v[0])
+        if self.bbox_sdf is not None:
+            v = dr.maximum(v, self.bbox_sdf.eval(x, detached))
+        return v, g
 
     def eval_all(self, x, detach_w=False):
         """Evaluates the image hessian using bspline interpolation"""
         v, g, h = self.call_wrap(x, self.texture.eval_cubic_hessian, False)
         v = mi.Float(v[0])
+        if self.bbox_sdf is not None:
+            v = dr.maximum(v, self.bbox_sdf.eval(x, False))
         g = mi.Vector3f(g[0])
         h = mi.Matrix3f(h[0])
 
@@ -453,6 +465,8 @@ class Grid3d(SDFBase):
         """Evaluates the image hessian using bspline interpolation"""
         v, g, h = self.texture.eval_cubic_hessian(x - dr.detach(self.p))
         v = mi.Float(v[0])
+        if self.bbox_sdf is not None:
+            v = dr.maximum(v, self.bbox_sdf.eval(x, False))
         g = mi.Vector3f(g[0])
         h = mi.Matrix3f(h[0])
 

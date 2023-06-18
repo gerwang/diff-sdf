@@ -1,0 +1,9 @@
+<scene version="2.1.0">
+    <path value="../"/>
+    <default name="envmap_filename" value="textures/cathedral.hdr"/>
+    <default name="guiding_mis_compensation" value="false"/>
+    <emitter type="envmap">
+        <string name="filename" value="$envmap_filename"/>
+        <boolean name="mis_compensation" value="false"/>
+    </emitter>
+</scene>

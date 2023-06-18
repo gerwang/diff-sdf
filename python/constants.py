@@ -17,5 +17,7 @@ PAPER_FIG_OUTPUT_DIR = os.path.join(PAPER_DIR, 'figures')
 # Default keys for the SDF parameters
 SDF_DEFAULT_KEY = 'SamplingIntegrator.sdf.data'
 SDF_DEFAULT_KEY_P = 'SamplingIntegrator.sdf.p'
+ENV_DEFAULT_KEY = 'EnvironmentMapEmitter.data'
+NERF_DEFAULT_KEY = 'Emitter.dummy_nerf_parameter'
 
 del __SCRIPT_DIR

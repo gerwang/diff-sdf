@@ -1,6 +1,7 @@
 """Various utility functions used throughout the code."""
 import os
 import subprocess
+from contextlib import contextmanager
 from os.path import join
 
 import drjit as dr
@@ -221,3 +222,18 @@ def atleast_4d(tensor):
     if tensor.ndim == 3:
         return tensor[..., None]
     return tensor
+
+
+@contextmanager
+def dr_no_jit(when=True):
+    if when:
+        old_loop_flag = dr.flag(dr.JitFlag.LoopRecord)
+        old_vcall_flag = dr.flag(dr.JitFlag.VCallRecord)
+        dr.set_flag(dr.JitFlag.LoopRecord, False)
+        dr.set_flag(dr.JitFlag.VCallRecord, False)
+    try:
+        yield
+    finally:
+        if when:
+            dr.set_flag(dr.JitFlag.LoopRecord, old_loop_flag)
+            dr.set_flag(dr.JitFlag.VCallRecord, old_vcall_flag)

@@ -50,7 +50,7 @@ def optimize_shape(scene_config, mts_args, ref_image_paths,
     assert any('_sdf_' in shape.id() for shape in sdf_scene.shapes()), "Could not find a placeholder shape for the SDF"
     params.keep(scene_config.param_keys)
 
-    opt = mi.ad.Adam(lr=config.learning_rate, params=params, mask_updates=config.mask_optimizer)
+    opt = mi.ad.Adam(lr=scene_config.learning_rate, params=params, mask_updates=scene_config.mask_optimizer)
     n_iter = config.n_iter
     scene_config.initialize(opt, sdf_scene)
     params.update(opt)

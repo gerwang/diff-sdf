@@ -1,0 +1,23 @@
+<scene version="2.1.0">
+	<default name="decouple_reparam" value="false"/>
+	<default name="detach_indirect_si" value="false"/>
+	<default name="guiding_mis_compensation" value="false"/>
+	<default name="query_emitter_index" value="-1"/>
+	<default name="curvature_epsilon" value="1e-4" />
+	<default name="use_bbox_sdf" value="false" />
+
+	<integrator type="$integrator">
+		<integer name="max_depth" value="$max_depth"/>
+		<string name="sdf_filename" value="$sdf_filename"/>
+		<boolean name="use_aovs" value="$use_aovs"/>
+		<boolean name="use_mis" value="$use_mis"/>
+		<boolean name="hide_emitters" value="$hide_emitters"/>
+		<boolean name="antithetic_sampling" value="$use_antithetic_sampling"/>
+		<boolean name="decouple_reparam" value="$decouple_reparam"/>
+		<boolean name="detach_indirect_si" value="$detach_indirect_si"/>
+		<boolean name="guiding_mis_compensation" value="$guiding_mis_compensation"/>
+		<integer name="query_emitter_index" value="$query_emitter_index"/>
+		<float name="curvature_epsilon" value="$curvature_epsilon" />
+		<boolean name="use_bbox_sdf" value="$use_bbox_sdf"/>
+	</integrator>
+</scene>
